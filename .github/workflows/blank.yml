@@ -1,0 +1,39 @@
+name: Update screener.json
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # каждые ~5 минут
+  workflow_dispatch: {}      # ручной запуск из вкладки Actions
+
+permissions:
+  contents: write            # чтобы коммитить изменения
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch latest screener.json from your VPS
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 30 http://212.193.4.161:9090/screener.json -o screener.json
+          # Быстрая проверка, что это валидный JSON
+          python - <<'PY'
+          import json,sys
+          json.load(open('screener.json','rb'))
+          print("JSON OK")
+          PY
+
+      - name: Commit only if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet --exit-code screener.json; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git add screener.json
+          git commit -m "update: screener.json [skip ci]"
+          git push
